@@ -2,7 +2,7 @@
 
 A client-side research tracker for **Thaumaturge 1.0.2**, **Minecraft 26.1.2** and **NeoForge 26.1.2.109+** (within 26.1.2).
 
-Open a research entry in the Thaumonomicon and click the small pin bookmark on the left edge of the book (hover for **Track research**). After closing the book, the HUD displays the requirements of its current stage. Only one research entry is tracked at a time; selecting another replaces it. Click **Stop tracking** on the selected entry to remove it.
+Open a research entry in the Thaumonomicon and click the small pin bookmark at the bottom edge of the left page (hover for **Track research**). After closing the book, the HUD displays the requirements of its current stage. Only one research entry is tracked at a time; selecting another replaces it. Click **Stop tracking** on the selected entry to remove it.
 
 - **J** shows or hides the panel.
 - **]** switches pages when a stage has too many requirements to fit.
@@ -39,7 +39,7 @@ The first command runs persistence tests. The GameTest checks requirements again
 
 **Thaumic Tracker** показывает требования выбранного исследования Thaumaturge прямо на игровом экране.
 
-Откройте страницу исследования в таумономиконе и нажмите на небольшую закладку с булавкой у левого края книги (подсказка **«Отслеживать»** появляется при наведении). Закройте книгу — сбоку появится список требований текущего этапа. Можно отслеживать одно исследование; выбор другого заменяет предыдущее. Кнопка **«Не отслеживать»** убирает выбранное исследование.
+Откройте страницу исследования в таумономиконе и нажмите на небольшую закладку с булавкой у нижнего края левой страницы (подсказка **«Отслеживать»** появляется при наведении). Закройте книгу — сбоку появится список требований текущего этапа. Можно отслеживать одно исследование; выбор другого заменяет предыдущее. Кнопка **«Не отслеживать»** убирает выбранное исследование.
 
 **J** скрывает и показывает панель. **]** переключает страницы длинного списка. Обе клавиши можно переназначить в настройках управления, в разделе **Thaumic Tracker**.
 

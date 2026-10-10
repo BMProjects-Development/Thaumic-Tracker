@@ -4,8 +4,6 @@ import com.leclowndu93150.thaumaturge.client.screen.research.EntryDetailScreen;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.api.distmarker.Dist;
@@ -102,8 +100,7 @@ public final class ThaumicTracker {
         Minecraft mc = Minecraft.getInstance();
         updateSession(mc);
         Identifier entry = ((EntryDetailScreenAccessor) (Object) screen).thaumictracker$entryId();
-        // A standard widget outside the book's transformed canvas, in actual screen coordinates.
-        Button button = Button.builder(buttonLabel(entry), pressed -> {
+        TrackBookmark button = new TrackBookmark(screen.width, screen.height, entry.equals(selected), pressed -> {
             updateSession(mc);
             if (context == null) return;
             selected = entry.equals(selected) ? null : entry;
@@ -111,13 +108,8 @@ public final class ThaumicTracker {
             if (selected != null && !preferences.visible()) preferences.setVisible(true);
             hud.reset();
             refresh(mc);
-            pressed.setMessage(buttonLabel(entry));
-        }).bounds(screen.width - 148, 6, 140, 20).build();
-        button.setTooltip(Tooltip.create(TrackerSnapshot.tr("track_tooltip")));
+            ((TrackBookmark) pressed).setTracked(entry.equals(selected));
+        });
         event.addListener(button);
-    }
-
-    private net.minecraft.network.chat.Component buttonLabel(Identifier entry) {
-        return TrackerSnapshot.tr(entry.equals(selected) ? "untrack" : "track");
     }
 }

@@ -12,6 +12,7 @@ tmp
 logs/
 .tools/
 run-gametest/
+run-smoke-client/
 output/
 
 .eclipse

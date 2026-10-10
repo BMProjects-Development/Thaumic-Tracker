@@ -2,15 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "org.bmp.thaumictracker.mixin",
-  "compatibilityLevel": "JAVA_21",
-  "mixins": [
-  ],
-  "client": [
-  ],
-  "injectors": {
-    "defaultRequire": 1
-  },
-  "overwrites": {
-    "requireAnnotations": true
-  }
+  "compatibilityLevel": "JAVA_25",
+  "client": ["EntryDetailScreenAccessor"],
+  "injectors": { "defaultRequire": 1 }
 }

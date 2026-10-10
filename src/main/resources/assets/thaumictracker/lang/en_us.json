@@ -1,5 +1,20 @@
 {
-  "itemGroup.thaumictracker": "Example Mod Tab",
-  "block.thaumictracker.example_block": "Example Block",
-  "item.thaumictracker.example_item": "Example Item"
+  "key.category.thaumictracker.main": "Thaumic Tracker",
+  "key.thaumictracker.toggle": "Show / hide research tracker",
+  "key.thaumictracker.next_page": "Next tracker page",
+  "gui.thaumictracker.track": "Track research",
+  "gui.thaumictracker.untrack": "Stop tracking",
+  "gui.thaumictracker.track_tooltip": "Keep the current stage's requirements on your HUD. Select another entry to replace it.",
+  "gui.thaumictracker.stage": "Stage %s / %s",
+  "gui.thaumictracker.complete": "Research complete!",
+  "gui.thaumictracker.locked": "Open this research in the Thaumonomicon.",
+  "gui.thaumictracker.missing": "Research unavailable in this world.",
+  "gui.thaumictracker.research": "Research: %s",
+  "gui.thaumictracker.obtain": "Obtain %s",
+  "gui.thaumictracker.craft": "Craft or hold: %s",
+  "gui.thaumictracker.theory": "Learn research note #%s",
+  "gui.thaumictracker.aspect": "%s points",
+  "gui.thaumictracker.no_items": "No matching items",
+  "gui.thaumictracker.ready": "Requirements met — continue in the Thaumonomicon.",
+  "gui.thaumictracker.page": "Page %s / %s · %s"
 }

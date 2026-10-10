@@ -1,0 +1,20 @@
+{
+  "key.category.thaumictracker.main": "Thaumic Tracker",
+  "key.thaumictracker.toggle": "Показать / скрыть трекер исследований",
+  "key.thaumictracker.next_page": "Следующая страница трекера",
+  "gui.thaumictracker.track": "Отслеживать",
+  "gui.thaumictracker.untrack": "Не отслеживать",
+  "gui.thaumictracker.track_tooltip": "Показывать требования текущего этапа на экране. Выбор другого исследования заменит текущее.",
+  "gui.thaumictracker.stage": "Этап %s / %s",
+  "gui.thaumictracker.complete": "Исследование завершено!",
+  "gui.thaumictracker.locked": "Откройте исследование в таумономиконе.",
+  "gui.thaumictracker.missing": "Исследование недоступно в этом мире.",
+  "gui.thaumictracker.research": "Исследование: %s",
+  "gui.thaumictracker.obtain": "Получить %s",
+  "gui.thaumictracker.craft": "Создать или иметь: %s",
+  "gui.thaumictracker.theory": "Изучить записку №%s",
+  "gui.thaumictracker.aspect": "Очки %s",
+  "gui.thaumictracker.no_items": "Нет подходящих предметов",
+  "gui.thaumictracker.ready": "Всё готово — продолжите в таумономиконе.",
+  "gui.thaumictracker.page": "Страница %s / %s · %s"
+}

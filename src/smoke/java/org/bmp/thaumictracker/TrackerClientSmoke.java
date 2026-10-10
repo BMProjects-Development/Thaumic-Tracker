@@ -9,6 +9,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
@@ -40,10 +41,24 @@ public final class TrackerClientSmoke {
     @SubscribeEvent public static void tick(ClientTickEvent.Post event) {
         if (!Boolean.getBoolean("thaumictracker.clientSmoke")) return;
         Minecraft mc = Minecraft.getInstance();
-        if (++ticks > 4000) throw new AssertionError("Client smoke test timed out at phase " + phase);
+        if (++ticks > 4000) {
+            capture(mc, "00-timeout.png");
+            throw new AssertionError("Client smoke test timed out at phase " + phase
+                    + ", screen=" + (mc.screen == null ? "none" : mc.screen.getClass().getName())
+                    + ", overlay=" + (mc.getOverlay() == null ? "none" : mc.getOverlay().getClass().getName()));
+        }
         if (delay-- > 0) return;
         if (phase == 0) {
-            if (!(mc.screen instanceof TitleScreen) || mc.getOverlay() != null) return;
+            if (mc.getOverlay() != null) return;
+            // A fresh CI profile opens onboarding before the title screen. Use its normal
+            // completion flow so Minecraft can save the setting and run the next-screen callback.
+            if (mc.screen instanceof AccessibilityOnboardingScreen onboarding) {
+                LoggerFactory.getLogger(TrackerClientSmoke.class).info("Completing first-launch accessibility onboarding");
+                onboarding.onClose();
+                delay = 40;
+                return;
+            }
+            if (!(mc.screen instanceof TitleScreen)) return;
             mc.options.guiScale().set(2);
             mc.options.renderDistance().set(2);
             mc.options.simulationDistance().set(5);

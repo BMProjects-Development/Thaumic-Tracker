@@ -31,7 +31,7 @@ neoForge {
         }
         clientSmoke {
             client()
-            gameDirectory = file('run-smoke-client')
+            gameDirectory = file(providers.gradleProperty('smokeGameDirectory').getOrElse('run-smoke-client'))
             systemProperty 'thaumictracker.clientSmoke', 'true'
         }
         configureEach { logLevel = org.slf4j.event.Level.INFO }

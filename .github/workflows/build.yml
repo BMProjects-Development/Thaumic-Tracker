@@ -81,6 +81,7 @@ jobs:
         env:
           NEOFORGE_VERSION: ${{ matrix.neoforge }}
           LIBGL_ALWAYS_SOFTWARE: "true"
+          ALSOFT_DRIVERS: "null"
         run: >-
           xvfb-run -a --server-args="-screen 0 1280x720x24"
           ./gradlew --no-daemon runClientSmoke

@@ -66,3 +66,22 @@ sourceSets.test.runtimeClasspath += sourceSets.main.compileClasspath
 neoForge.ideSyncTask generateModMetadata
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 tasks.named('test') { useJUnitPlatform() }
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+tasks.register('releaseZip', Zip) {
+    archiveFileName = "Thaumic-Tracker-${mod_version}.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from(tasks.named('jar')) { into 'mods' }
+    from('README.md')
+    from('docs') { into 'docs' }
+}
+
+// Stage only the current version, even if build/libs contains older builds.
+tasks.register('releaseArtifacts', Sync) {
+    from tasks.named('jar'), tasks.named('sourcesJar'), tasks.named('releaseZip')
+    into layout.buildDirectory.dir('release')
+}

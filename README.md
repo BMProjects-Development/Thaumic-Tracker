@@ -1,25 +1,36 @@
 # Thaumic Tracker
 
-A compact research tracker for **Thaumaturge**. Pin an entry in the
-Thaumonomicon and follow its current requirements while you play.
+Pin research in **Thaumaturge's Thaumonomicon** and follow its requirements
+on your HUD while gathering items, exploring, or working at your base.
 
-- Track items, crafting, prerequisite research, theory notes and observation aspects.
-- Follow stage changes and research completion automatically.
-- Show or hide the panel and page through long requirement lists with configurable keys.
-- Remember your selection for each world, server and player account.
-- Track custom research from datapacks and KubeThaum without additional configuration.
-- English and Russian translations included.
+[Download](https://github.com/BMProjects-Development/Thaumic-Tracker/releases/latest)
+· [What's changed](changelogs/README.md)
+· [Report an issue](https://github.com/BMProjects-Development/Thaumic-Tracker/issues)
 
-**Minecraft 26.1.2 · NeoForge 26.1.2.109+ (before 26.2) · Java 25 · Thaumaturge 1.0.2**
+## Keep your research in sight
 
-Install on the **client** alongside Thaumaturge and its required dependencies.
-The server does not need Thaumic Tracker. KubeThaum is optional.
+- **See what's missing:** items, crafting, prerequisite research, theory notes,
+  and observation aspects appear in one compact panel.
+- **Follow your progress:** requirements refresh automatically, and the panel
+  follows the next stage when you advance it in the book.
+- **Pick up where you left off:** your selection is remembered for each world,
+  server, and player account.
+- **Track your modpack's research:** datapack and KubeThaum entries work without
+  additional configuration.
+
+## Getting started
+
+1. Install the mod on your **client** alongside Thaumaturge and its dependencies.
+   The server does not need Thaumic Tracker. KubeThaum is optional.
+2. Open a research entry in the Thaumonomicon and click the pin ribbon at the
+   bottom of the left page.
+3. Close the book to see your requirements. Press **J** to hide or show the panel,
+   and **]** to page through long lists.
+
+Advance research in the Thaumonomicon as usual; the tracker follows your progress.
 
 ## Guides
 
-- [Руководство на русском](docs/guide-ru.md)
-- [English guide](docs/guide-en.md)
-
-[Downloads](https://github.com/BMProjects-Development/Thaumic-Tracker/releases)
-· [Builds](https://github.com/BMProjects-Development/Thaumic-Tracker/actions/workflows/build.yml)
-· [Report an issue](https://github.com/BMProjects-Development/Thaumic-Tracker/issues)
+| Русский | English |
+| --- | --- |
+| [Отслеживание исследований](docs/guide-ru.md) | [Tracking your research](docs/guide-en.md) |

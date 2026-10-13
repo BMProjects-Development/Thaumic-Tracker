@@ -25,35 +25,23 @@ jobs:
         neoforge: ["26.1.2.109", "26.1.2.115"]
     outputs:
       version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      stem: ${{ steps.version.outputs.stem }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - name: Read and validate mod version
-        id: version
-        shell: python
-        run: |
-          import os
-          import re
-          from pathlib import Path
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
 
-          properties = dict(line.split("=", 1) for line in Path("gradle.properties").read_text().splitlines()
-                            if "=" in line and not line.lstrip().startswith("#"))
-          version = properties["mod_version"].strip()
-          mod_id = properties["mod_id"].strip()
-          minecraft = properties["minecraft_version"].strip()
-          assert re.fullmatch(r"[0-9]+(?:\.[0-9]+)+(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?", version), "Invalid mod_version"
-          assert re.fullmatch(r"[a-z][a-z0-9_]*", mod_id), "Invalid mod_id"
-          assert re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", minecraft), "Invalid minecraft_version"
-          tag = f"v{version}"
-          if os.environ["GITHUB_REF"].startswith("refs/tags/"):
-              assert os.environ["GITHUB_REF_NAME"] == tag, "Tag must match mod_version in gradle.properties"
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"version={version}\ntag={tag}\nstem={mod_id}-{minecraft}-{version}\n")
+      - name: Verify release automation
+        run: python -m unittest discover -s .github/scripts -p "test_*.py"
+
+      - name: Validate version and release notes
+        id: version
+        run: python .github/scripts/release.py check
 
       - name: Set up Java 25
         uses: actions/setup-java@v6
@@ -121,7 +109,7 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: release-${{ needs.build.outputs.tag }}
+      group: thaumictracker-release
       cancel-in-progress: false
     steps:
       - name: Checkout release source
@@ -136,31 +124,12 @@ jobs:
           name: thaumictracker-${{ needs.build.outputs.version }}
           path: release
 
-      - name: Publish new version
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Publish or replace this version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MOD_VERSION: ${{ needs.build.outputs.version }}
-          RELEASE_TAG: ${{ needs.build.outputs.tag }}
-          RELEASE_STEM: ${{ needs.build.outputs.stem }}
-        shell: bash
-        run: |
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists; keeping the published version."
-            exit 0
-          fi
-          if git rev-parse --verify --quiet "refs/tags/$RELEASE_TAG" >/dev/null; then
-            tag_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
-            if [ "$tag_commit" != "$(git rev-parse "$GITHUB_SHA^{commit}")" ]; then
-              echo "Existing tag $RELEASE_TAG points to a different commit." >&2
-              exit 1
-            fi
-          fi
-          gh release create "$RELEASE_TAG" \
-            "release/$RELEASE_STEM.jar" \
-            "release/$RELEASE_STEM-sources.jar" \
-            "release/Thaumic-Tracker-$MOD_VERSION.zip" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Thaumic Tracker $MOD_VERSION" \
-            --target "$GITHUB_SHA" \
-            --generate-notes
-
+        run: python .github/scripts/release.py publish

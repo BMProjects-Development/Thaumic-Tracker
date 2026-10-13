@@ -16,27 +16,18 @@ gathering items or working at your base.
 
 ## Installation
 
-Version **1.0** requires:
-
-| Component | Version |
-| --- | --- |
-| Minecraft | 26.1.2 |
-| NeoForge | 26.1.2.109 or later within 26.1.2 |
-| Java | 25 |
-| Thaumaturge | 1.0.2, with its required dependencies |
-
-1. Download `thaumictracker-26.1.2-1.0.jar` from
-   [Releases](https://github.com/BMProjects-Development/Thaumic-Tracker/releases).
-2. Put it in your Minecraft instance's `mods` folder.
-3. Start the client with Thaumaturge and its dependencies installed.
-
-Install the regular JAR. The `-sources.jar` contains source code for developers.
-The release ZIP contains the game JAR in `mods/` and these guides; do not put
-that ZIP in the `mods` folder.
+1. Download the regular mod JAR from
+   [Releases](https://github.com/BMProjects-Development/Thaumic-Tracker/releases/latest).
+   Choose the file matching your Minecraft and loader version.
+2. Put it in your Minecraft instance's `mods` folder alongside Thaumaturge and
+   its required dependencies.
+3. Start the client and open a world or server.
 
 In multiplayer, install Thaumic Tracker on each client that wants the panel.
-The server only needs Thaumaturge and its normal dependencies. KubeThaum is
-optional. Other Thaumaturge versions need a compatibility check before use.
+The server does not need the tracker. KubeThaum is optional.
+
+The `-sources.jar` is for developers. The ZIP includes the playable JAR in `mods/`,
+these guides, and release history; extract it before installing the JAR.
 
 ## Your first tracked entry
 
@@ -90,8 +81,8 @@ A new research stage returns the list to its first page.
 
 The panel hides while screens are open, the F3 overlay is shown, or the HUD
 is hidden with F1. Very small GUI areas may leave no room for the panel:
-lower Minecraft's GUI scale or enlarge the window. Version 1.0 has no separate
-tracker size or position setting.
+lower Minecraft's GUI scale or enlarge the window. The tracker has no separate
+size or position setting.
 
 ## Switching and stopping tracking
 
@@ -133,7 +124,7 @@ selected entry, select another existing entry.
 
 | Symptom | What to check |
 | --- | --- |
-| No pin ribbon | Open an entry detail page, not the category overview. Confirm Thaumaturge 1.0.2 and Thaumic Tracker are installed on the client. |
+| No pin ribbon | Open an entry detail page, not the category overview. Confirm Thaumaturge and Thaumic Tracker are installed on the client. |
 | No panel | Select an entry, close screens, press J and hide F3. Check key conflicts and GUI scale. |
 | A requirement seems satisfied but is unchecked | Compare the book. Item components, learned notes and aspect-pool points matter; a similar item or an unlearned note may not qualify. |
 | All requirements met but the stage has not changed | Advance the stage in the Thaumonomicon. Submission is not automatic. |

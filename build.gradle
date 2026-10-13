@@ -72,11 +72,26 @@ tasks.withType(AbstractArchiveTask).configureEach {
     reproducibleFileOrder = true
 }
 
+def releaseNotes = layout.projectDirectory.file("changelogs/${mod_version}.md")
+
+tasks.register('verifyReleaseNotes') {
+    doLast {
+        def notes = releaseNotes.asFile
+        if (!notes.isFile() || notes.getText('UTF-8').trim().isEmpty()) {
+            throw new GradleException("Add release notes in ${notes.name} under changelogs/")
+        }
+    }
+}
+
+tasks.named('check') { dependsOn 'verifyReleaseNotes' }
+
 tasks.register('releaseZip', Zip) {
+    dependsOn tasks.named('verifyReleaseNotes')
     archiveFileName = "Thaumic-Tracker-${mod_version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(tasks.named('jar')) { into 'mods' }
     from('README.md')
+    from('changelogs') { into 'changelogs' }
     from('docs') { into 'docs' }
 }
 

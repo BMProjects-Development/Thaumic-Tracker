@@ -7,5 +7,6 @@ replace that version's release files; other versions stay available.
 
 | Version | Highlights |
 | --- | --- |
+| [1.0.2](1.0.2.md) | Simplified and Traditional Chinese translations. |
 | [1.0.1](1.0.1.md) | Mod icon, clearer guides, and updated release automation. |
 | [1.0](1.0.md) | Research tracking in the Thaumonomicon and on your HUD. |

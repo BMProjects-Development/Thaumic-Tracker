@@ -1,0 +1,20 @@
+{
+  "key.category.thaumictracker.main": "神秘追蹤",
+  "key.thaumictracker.toggle": "顯示/隱藏追蹤的研究",
+  "key.thaumictracker.next_page": "追蹤下一個",
+  "gui.thaumictracker.track": "追蹤研究",
+  "gui.thaumictracker.untrack": "停止追蹤",
+  "gui.thaumictracker.track_tooltip": "在HUD上保留當前階段的要求。選擇其他條目以將其替換。",
+  "gui.thaumictracker.stage": "第 %s 頁 / 共 %s 頁",
+  "gui.thaumictracker.complete": "研究完成！",
+  "gui.thaumictracker.locked": "在秘術寶典中打開此研究",
+  "gui.thaumictracker.missing": "該研究尚不存在",
+  "gui.thaumictracker.research": "研究：%s",
+  "gui.thaumictracker.obtain": "%s",
+  "gui.thaumictracker.craft": "合成：%s",
+  "gui.thaumictracker.theory": "研究筆記 #%s",
+  "gui.thaumictracker.aspect": "%s 研究點",
+  "gui.thaumictracker.no_items": "沒有匹配的物品",
+  "gui.thaumictracker.ready": "要求已滿足——請在秘術寶典中繼續。",
+  "gui.thaumictracker.page": "頁面 %s / %s · %s"
+}

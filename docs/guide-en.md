@@ -26,6 +26,9 @@ gathering items or working at your base.
 In multiplayer, install Thaumic Tracker on each client that wants the panel.
 The server does not need the tracker. KubeThaum is optional.
 
+For updates, choose a Tracker release compatible with your Thaumaturge release;
+see the [release history](../changelogs/README.md). Saved selections are kept.
+
 The `-sources.jar` is for developers. The ZIP includes the playable JAR in `mods/`,
 these guides, and release history; extract it before installing the JAR.
 
@@ -66,6 +69,10 @@ selected with a completion message until you switch entries or stop tracking.
 
 Removing required items from your inventory can clear their check marks on
 the next refresh. The panel reflects your current state.
+
+For vis crystals, the required aspect matters as well as the item itself.
+Recipe ingredients and multiblock diagrams are viewed in the book; the panel
+lists the requirements for advancing the research stage.
 
 ## Controls
 

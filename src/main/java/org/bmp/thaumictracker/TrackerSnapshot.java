@@ -5,10 +5,10 @@ import com.leclowndu93150.thaumaturge.api.capability.KnowledgeAccess;
 import com.leclowndu93150.thaumaturge.api.capability.KnowledgeType;
 import com.leclowndu93150.thaumaturge.api.research.IResearchEntry;
 import com.leclowndu93150.thaumaturge.api.research.ResearchRequirement;
+import com.leclowndu93150.thaumaturge.api.research.pool.AspectPoolAccess;
 import com.leclowndu93150.thaumaturge.content.research.ResearchManager;
 import com.leclowndu93150.thaumaturge.content.research.note.ResearchNoteData;
 import com.leclowndu93150.thaumaturge.content.research.note.ResearchNotes;
-import com.leclowndu93150.thaumaturge.content.research.pool.AspectPools;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.network.chat.Component;
@@ -58,11 +58,10 @@ public record TrackerSnapshot(Component title, Component status, List<Row> rows,
                 rows.add(new Row(tr("theory", ordinal), ItemStack.EMPTY, knowledge.isResearchKnown(learnKey)));
             }
         }
-        // In Thaumaturge 1.0.2 observations cost aspect-pool points, and theory requires learned notes.
-        // Display the real costs rather than incorrectly comparing the reward amount with knowledge levels.
+        // Observations spend aspect-pool points; theory requires learned notes, not knowledge levels.
         for (var cost : ResearchNotes.stageObservationCost(entry, stage).entries()) {
-            boolean discovered = AspectPools.isDiscovered(player, cost.aspect());
-            int have = AspectPools.amount(player, cost.aspect());
+            boolean discovered = AspectPoolAccess.isDiscovered(player, cost.aspect());
+            int have = AspectPoolAccess.amount(player, cost.aspect());
             Component name = discovered ? AspectComponents.name(cost.aspect())
                     : Component.translatable("tooltip.thaumaturge.aspect.unknown");
             rows.add(new Row(tr("aspect", name), ItemStack.EMPTY, discovered && have >= cost.amount(),

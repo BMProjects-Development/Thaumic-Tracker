@@ -13,6 +13,23 @@ The second checks the book button, HUD, and client synchronization in a disposab
 development world. Smoke test code and data are excluded from release JARs.
 Dependency versions are maintained in `gradle.properties`.
 
+## Thaumaturge integration
+
+Tracker 1.1 targets Thaumaturge 1.1. Thaumaturge's
+[update notes](https://github.com/Leclowndu93150/Thaumaturge/blob/c71c2a275ca12278984bee4c7b3918e41f17033f/changelog.md)
+cover book scrolling, text overflow fixes, research tree changes, and new entries.
+These improve the book without replacing the pinned requirements HUD.
+Keep reading research from the registry instead of maintaining entry-specific rules.
+Multiblock diagrams and recipe displays describe crafting, not stage requirements;
+they should not become extra checkboxes in the tracker.
+
+The screen now owns an `EntryDetailModel`; the client-only accessor exposes that
+model to read `entryId()`. Aspect queries use `AspectPoolAccess`. Readiness and
+craft checks remain delegated to `ResearchManager` so Tracker follows the server.
+The GameTest covers real crystal components and the new armor trim research,
+multiple theory notes across stages, observation costs, and server advancement.
+The client smoke test verifies the accessor, mouse routing, resizing and synchronization.
+
 ## Release automation
 
 GitHub Actions builds and tests against both NeoForge versions in its matrix,

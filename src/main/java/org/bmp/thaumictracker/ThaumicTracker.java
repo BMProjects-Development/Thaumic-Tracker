@@ -99,7 +99,7 @@ public final class ThaumicTracker {
         if (!(event.getScreen() instanceof EntryDetailScreen screen)) return;
         Minecraft mc = Minecraft.getInstance();
         updateSession(mc);
-        Identifier entry = ((EntryDetailScreenAccessor) (Object) screen).thaumictracker$entryId();
+        Identifier entry = ((EntryDetailScreenAccessor) (Object) screen).thaumictracker$model().entryId();
         TrackBookmark button = new TrackBookmark(screen.width, screen.height, entry.equals(selected), pressed -> {
             updateSession(mc);
             if (context == null) return;

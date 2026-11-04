@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        neoforge: ["26.1.2.109", "26.1.2.115"]
+        neoforge: ["26.1.2.109", "26.1.2.122"]
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:

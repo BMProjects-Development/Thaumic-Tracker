@@ -10,7 +10,7 @@ public final class TrackBookmark extends Button {
 
     public TrackBookmark(int screenWidth, int screenHeight, boolean tracked, OnPress onPress) {
         // Hang below the left page, clear of both side tabs, corner arrows and the central back button.
-        // The 1.0.2 book is 181 px high at 1.3 scale; keep the whole ribbon visible in small windows.
+        // The book is 181 px high at 1.3 scale; keep the whole ribbon visible in small windows.
         super(Math.clamp(Math.round(screenWidth / 2f - 88), 4, Math.max(4, screenWidth - 22)),
                 Math.clamp(Math.round((screenHeight + 235.3f) / 2) - 13, 4, Math.max(4, screenHeight - 28)),
                 18, 24, TrackerSnapshot.tr("track"), onPress, DEFAULT_NARRATION);

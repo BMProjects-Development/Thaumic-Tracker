@@ -1,6 +1,6 @@
 # Working on Thaumic Tracker
 
-Use the checked-in Gradle wrapper with Java 25:
+On the `1.21.1` branch, use the checked-in Gradle wrapper with Java 21:
 
 ```sh
 ./gradlew build releaseArtifacts runGameTestServer -PsmokeTests
@@ -23,8 +23,7 @@ Keep reading research from the registry instead of maintaining entry-specific ru
 Multiblock diagrams and recipe displays describe crafting, not stage requirements;
 they should not become extra checkboxes in the tracker.
 
-The screen now owns an `EntryDetailModel`; the client-only accessor exposes that
-model to read `entryId()`. Aspect queries use `AspectPoolAccess`. Readiness and
+The client-only accessor reads `entryId` from the Thaumaturge 1.21.1 research screen. Aspect queries use `AspectPoolAccess`. Readiness and
 craft checks remain delegated to `ResearchManager` so Tracker follows the server.
 The GameTest covers real crystal components and the new armor trim research,
 multiple theory notes across stages, observation costs, and server advancement.

@@ -2,7 +2,7 @@ package org.bmp.thaumictracker;
 
 import com.leclowndu93150.thaumaturge.api.aspect.AspectInstance;
 import com.leclowndu93150.thaumaturge.api.aspect.IAspect;
-import com.leclowndu93150.thaumaturge.api.capability.KnowledgeAccess;
+import com.leclowndu93150.thaumaturge.api.capability.PlayerResearchAccess;
 import com.leclowndu93150.thaumaturge.api.research.IResearchEntry;
 import com.leclowndu93150.thaumaturge.api.research.ResearchRequirement;
 import com.leclowndu93150.thaumaturge.api.research.pool.AspectPoolAccess;
@@ -11,49 +11,41 @@ import com.leclowndu93150.thaumaturge.content.research.ResearchManager;
 import com.leclowndu93150.thaumaturge.content.research.note.ResearchNoteData;
 import com.leclowndu93150.thaumaturge.registry.TTDataComponents;
 import com.mojang.authlib.GameProfile;
-import com.mojang.serialization.MapCodec;
-import java.util.List;
 import java.util.UUID;
-import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.GameTestInstance;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Rotation;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 @EventBusSubscriber(modid = ThaumicTracker.ID)
-public final class TrackerGameTest extends GameTestInstance {
-    public TrackerGameTest(TestData<Holder<TestEnvironmentDefinition<?>>> data) { super(data); }
+@PrefixGameTestTemplate(false)
+public final class TrackerGameTest {
 
     @SubscribeEvent public static void register(RegisterGameTestsEvent event) {
-        if (!Boolean.getBoolean("thaumictracker.gameTests")) return;
-        var environment = event.registerEnvironment(Identifier.parse("thaumictracker:smoke"), new TestEnvironmentDefinition.AllOf(List.of()));
-        event.registerTest(Identifier.parse("thaumictracker:requirements"), new TrackerGameTest(
-                new TestData<>(environment, Identifier.parse("thaumaturge:empty_5x5x7"), 100, 0, true, Rotation.NONE)));
+        if (Boolean.getBoolean("thaumictracker.gameTests")) event.register(TrackerGameTest.class);
     }
 
-    @Override public void run(GameTestHelper helper) {
+    @GameTest(templateNamespace = ThaumicTracker.ID, template = "empty", timeoutTicks = 100)
+    public static void requirements(GameTestHelper helper) {
         var player = FakePlayerFactory.get(helper.getLevel(), new GameProfile(UUID.randomUUID(), "TrackerTest"));
-        var knowledge = (PlayerKnowledge) KnowledgeAccess.of(player);
-        var id = Identifier.parse("thaumictracker:tracker_test");
-        knowledge.clear();
+        var knowledge = (PlayerKnowledge) PlayerResearchAccess.of(player);
+        var id = ResourceLocation.parse("thaumictracker:tracker_test");
+        knowledge.wipe();
         player.getInventory().clearContent();
-        check(TrackerSnapshot.read(player, Identifier.parse("pack:removed")).rows().isEmpty(), "Removed entry failed");
+        check(TrackerSnapshot.read(player, ResourceLocation.parse("pack:removed")).rows().isEmpty(), "Removed entry failed");
         check(TrackerSnapshot.read(player, id).rows().isEmpty(), "Locked entry exposed requirements");
-        knowledge.addResearch(id);
+        knowledge.learn(id);
         var empty = TrackerSnapshot.read(player, id);
         check(empty.rows().size() == 6 && !empty.ready(), "Initial requirement set incorrect: " + empty);
         check(empty.rows().stream().noneMatch(TrackerSnapshot.Row::met), "Empty requirements unexpectedly satisfied");
@@ -66,37 +58,38 @@ public final class TrackerGameTest extends GameTestInstance {
         check(held.rows().get(1).met() && held.rows().get(2).met(), "Split stacks or item tags miscounted");
         check(held.rows().get(3).met(), "Native binary craft semantics not respected");
         player.getInventory().setItem(4, ItemStack.EMPTY);
-        knowledge.addResearch(ResearchManager.craftedKey(Identifier.parse("minecraft:gold_ingot")));
+        knowledge.learn(ResearchManager.craftedKey(ResourceLocation.parse("minecraft:gold_ingot")));
         check(TrackerSnapshot.read(player, id).rows().get(3).met(), "Craft history ignored");
-        var prerequisite = Identifier.parse("thaumictracker:prerequisite");
-        knowledge.addResearch(prerequisite);
+        var prerequisite = ResourceLocation.parse("thaumictracker:prerequisite");
+        knowledge.learn(prerequisite);
         knowledge.markComplete(prerequisite);
-        knowledge.addResearch(ResearchNoteData.learnKey(id, 0));
+        knowledge.learn(ResearchNoteData.learnKey(id, 0));
         var aer = player.registryAccess().lookupOrThrow(IAspect.REGISTRY_KEY)
-                .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, Identifier.parse("thaumaturge:aer")));
+                .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, ResourceLocation.parse("thaumaturge:aer")));
+        AspectPoolAccess.spend(player, aer, AspectPoolAccess.amount(player, aer));
         AspectPoolAccess.grant(player, aer, 4);
         var ready = TrackerSnapshot.read(player, id);
         check(ready.ready() && ready.rows().stream().allMatch(TrackerSnapshot.Row::met), "Theory/aspect/prerequisite checks disagree with server");
         // Losing a required item must clear readiness immediately on the next snapshot.
         player.getInventory().setItem(0, ItemStack.EMPTY);
         check(!TrackerSnapshot.read(player, id).ready(), "Inventory removal did not clear readiness");
-        knowledge.setResearchStage(id, 1);
+        knowledge.setStage(id, 1);
         var next = TrackerSnapshot.read(player, id);
         check(next.rows().size() == 1 && next.rows().getFirst().icon().is(Items.GOLDEN_APPLE), "Stage change did not replace requirements");
-        knowledge.setResearchStage(id, 2);
+        knowledge.setStage(id, 2);
         var later = TrackerSnapshot.read(player, id);
         check(later.rows().size() == 3 && later.rows().stream().noneMatch(TrackerSnapshot.Row::met),
-                "Later stage reused the first theory note or wrong observation multiplier");
+                "Unexpected later-stage requirements: " + later);
         check(later.rows().getLast().count().equals("4 / 6"), "Observation rows must use the maximum cost, not their sum");
-        knowledge.addResearch(ResearchNoteData.learnKey(id, 1));
+        knowledge.learn(ResearchNoteData.learnKey(id, 1));
         check(!TrackerSnapshot.read(player, id).rows().get(1).met(), "Learning one note satisfied a different note");
-        knowledge.addResearch(ResearchNoteData.learnKey(id, 2));
+        knowledge.learn(ResearchNoteData.learnKey(id, 2));
         AspectPoolAccess.grant(player, aer, 2);
         check(TrackerSnapshot.read(player, id).ready(), "Later theory/aspect requirements did not become ready");
-        check(AspectPoolAccess.amount(player, aer) == 6 && knowledge.researchStage(id) == 2,
+        check(AspectPoolAccess.amount(player, aer) == 6 && knowledge.stageOf(id) == 2,
                 "Reading the tracker changed research or spent points");
         check(ResearchManager.advanceStage(player, id), "Server rejected a stage marked ready by the tracker");
-        check(AspectPoolAccess.amount(player, aer) == 0 && knowledge.isResearchComplete(id),
+        check(AspectPoolAccess.amount(player, aer) == 0 && knowledge.hasCompleted(id),
                 "Server did not consume the displayed cost or complete the research");
         check(TrackerSnapshot.read(player, id).rows().isEmpty(), "Completed entry still displays costs");
         var patch = DataComponentPatch.builder().set(DataComponents.CUSTOM_NAME, Component.literal("Required name")).build();
@@ -106,7 +99,7 @@ public final class TrackerGameTest extends GameTestInstance {
         check(named.matches(shown), "Displayed stack lost required components");
         // Exercise real 1.1 data: the same crystal item with a different aspect must not count.
         player.getInventory().clearContent();
-        var bellowsId = Identifier.parse("thaumaturge:bellows");
+        var bellowsId = ResourceLocation.parse("thaumaturge:bellows");
         var bellows = player.registryAccess().lookupOrThrow(IResearchEntry.REGISTRY_KEY)
                 .getOrThrow(ResourceKey.create(IResearchEntry.REGISTRY_KEY, bellowsId)).value();
         var crystal = bellows.stages().getFirst().obtain().getFirst();
@@ -116,11 +109,11 @@ public final class TrackerGameTest extends GameTestInstance {
         var wrongCrystal = requiredCrystal.copy();
         wrongCrystal.remove(TTDataComponents.CRYSTAL_ASPECT.get());
         player.getInventory().setItem(0, wrongCrystal);
-        knowledge.addResearch(bellowsId);
+        knowledge.learn(bellowsId);
         var bellowsSnapshot = TrackerSnapshot.read(player, bellowsId);
         check(!bellowsSnapshot.rows().getFirst().met(), "Crystal without the required aspect counted");
         var terra = player.registryAccess().lookupOrThrow(IAspect.REGISTRY_KEY)
-                .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, Identifier.parse("thaumaturge:terra")));
+                .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, ResourceLocation.parse("thaumaturge:terra")));
         wrongCrystal.set(TTDataComponents.CRYSTAL_ASPECT.get(), new AspectInstance(terra, 1));
         check(!TrackerSnapshot.read(player, bellowsId).rows().getFirst().met(), "Crystal of a different aspect counted");
         check(bellowsSnapshot.rows().stream().anyMatch(row -> row.text().equals(TrackerSnapshot.tr("aspect",
@@ -128,8 +121,8 @@ public final class TrackerGameTest extends GameTestInstance {
                 "Undiscovered aspect name was exposed");
         player.getInventory().setItem(0, requiredCrystal);
         check(TrackerSnapshot.read(player, bellowsId).rows().getFirst().met(), "Correct crystal was not counted");
-        var trimsId = Identifier.parse("thaumaturge:armor_trims");
-        knowledge.addResearch(trimsId);
+        var trimsId = ResourceLocation.parse("thaumaturge:armor_trims");
+        knowledge.learn(trimsId);
         var trims = player.registryAccess().lookupOrThrow(IResearchEntry.REGISTRY_KEY)
                 .getOrThrow(ResourceKey.create(IResearchEntry.REGISTRY_KEY, trimsId)).value();
         var template = trims.stages().getFirst().obtain().getFirst();
@@ -138,6 +131,4 @@ public final class TrackerGameTest extends GameTestInstance {
         helper.succeed();
     }
     private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
-    @Override public MapCodec<? extends GameTestInstance> codec() { throw new UnsupportedOperationException(); }
-    @Override protected MutableComponent typeDescription() { return Component.literal("thaumictracker:requirements"); }
 }

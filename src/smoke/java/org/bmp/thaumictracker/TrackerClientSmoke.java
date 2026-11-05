@@ -1,6 +1,6 @@
 package org.bmp.thaumictracker;
 
-import com.leclowndu93150.thaumaturge.api.capability.KnowledgeAccess;
+import com.leclowndu93150.thaumaturge.api.capability.PlayerResearchAccess;
 import com.leclowndu93150.thaumaturge.api.aspect.IAspect;
 import com.leclowndu93150.thaumaturge.api.research.IResearchEntry;
 import com.leclowndu93150.thaumaturge.api.research.pool.AspectPoolAccess;
@@ -13,14 +13,14 @@ import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.MouseButtonInfo;
-import net.minecraft.resources.Identifier;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 /** Opt-in integration checks in a disposable development world, excluded from release jars. */
 @EventBusSubscriber(modid = ThaumicTracker.ID, value = Dist.CLIENT)
 public final class TrackerClientSmoke {
-    private static final Identifier ID = Identifier.parse("thaumictracker:tracker_test");
+    private static final ResourceLocation ID = ResourceLocation.parse("thaumictracker:tracker_test");
     private static int phase;
     private static int delay = 40;
     private static int ticks;
@@ -68,8 +68,10 @@ public final class TrackerClientSmoke {
             mc.options.pauseOnLostFocus = false;
             mc.createWorldOpenFlows().createFreshLevel("tracker-smoke-" + System.currentTimeMillis(),
                     new LevelSettings("Tracker smoke test", GameType.CREATIVE,
-                            new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true, WorldDataConfiguration.DEFAULT),
-                    new WorldOptions(0, false, false), WorldPresets::createFlatWorldDimensions, mc.screen);
+                            false, Difficulty.PEACEFUL, true, new GameRules(), WorldDataConfiguration.DEFAULT),
+                    new WorldOptions(0, false, false),
+                    registries -> registries.registryOrThrow(Registries.WORLD_PRESET)
+                            .getHolderOrThrow(WorldPresets.FLAT).value().createWorldDimensions(), mc.screen);
             phase = 1;
             return;
         }
@@ -77,9 +79,9 @@ public final class TrackerClientSmoke {
         switch (phase) {
             case 1 -> {
                 mutateServer(mc, (player, knowledge) -> {
-                    knowledge.addResearch(ID);
+                    knowledge.learn(ID);
                     var aer = player.registryAccess().lookupOrThrow(IAspect.REGISTRY_KEY)
-                            .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, Identifier.parse("thaumaturge:aer")));
+                            .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, ResourceLocation.parse("thaumaturge:aer")));
                     AspectPoolAccess.spend(player, aer, AspectPoolAccess.amount(player, aer));
                     AspectPoolAccess.refund(player, aer, 4);
                 });
@@ -87,13 +89,13 @@ public final class TrackerClientSmoke {
             }
             case 2 -> {
                 mc.getTutorial().setStep(net.minecraft.client.tutorial.TutorialSteps.NONE);
-                mc.getToastManager().clear();
+                mc.getToasts().clear();
                 mc.gui.getChat().clearMessages(true);
                 var holder = mc.player.registryAccess().lookupOrThrow(IResearchEntry.REGISTRY_KEY)
                         .getOrThrow(ResourceKey.create(IResearchEntry.REGISTRY_KEY, ID));
                 var screen = new EntryDetailScreen(holder, ID, null);
                 mc.setScreen(screen);
-                check(((EntryDetailScreenAccessor) (Object) screen).thaumictracker$model().entryId().equals(ID), "Accessor Mixin not applied");
+                check(((EntryDetailScreenAccessor) (Object) screen).thaumictracker$entryId().equals(ID), "Accessor Mixin not applied");
                 check(button(mc).getMessage().equals(TrackerSnapshot.tr("track")), "Track button missing");
                 var observation = TrackerSnapshot.read(mc.player, ID).rows().getLast();
                 check(observation.met() && observation.count().equals("4 / 4"), "Aspect balance did not sync to the client");
@@ -106,7 +108,7 @@ public final class TrackerClientSmoke {
                 click(mc);
                 check(button(mc).getMessage().equals(TrackerSnapshot.tr("track")), "Book did not unpin research");
                 click(mc);
-                mc.screen.resize(mc.screen.width, mc.screen.height);
+                mc.screen.resize(mc, mc.screen.width, mc.screen.height);
                 check(mc.screen.children().stream().filter(child -> child instanceof Button b && b.getMessage().equals(TrackerSnapshot.tr("untrack"))).count() == 1,
                         "Resize duplicated or lost tracker button");
                 phase++; delay = 20;
@@ -116,7 +118,7 @@ public final class TrackerClientSmoke {
                 mc.setScreen(null);
                 mutateServer(mc, (player, knowledge) -> {
                     var aer = player.registryAccess().lookupOrThrow(IAspect.REGISTRY_KEY)
-                            .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, Identifier.parse("thaumaturge:aer")));
+                            .getOrThrow(ResourceKey.create(IAspect.REGISTRY_KEY, ResourceLocation.parse("thaumaturge:aer")));
                     AspectPoolAccess.spend(player, aer, 2);
                 });
                 phase++; delay = 30;
@@ -136,7 +138,7 @@ public final class TrackerClientSmoke {
             case 7 -> {
                 check(!preferences().visible(), "Toggle hotkey failed to hide HUD");
                 KeyMapping.click(InputConstants.Type.KEYSYM.getOrCreate(org.lwjgl.glfw.GLFW.GLFW_KEY_J));
-                mutateServer(mc, (player, knowledge) -> knowledge.setResearchStage(ID, 1));
+                mutateServer(mc, (player, knowledge) -> knowledge.setStage(ID, 1));
                 phase++; delay = 30;
             }
             case 8 -> {
@@ -164,11 +166,11 @@ public final class TrackerClientSmoke {
         var server = mc.getSingleplayerServer();
         server.execute(() -> {
             var player = server.getPlayerList().getPlayer(uuid);
-            var knowledge = (PlayerKnowledge) KnowledgeAccess.of(player);
+            var knowledge = (PlayerKnowledge) PlayerResearchAccess.of(player);
             mutation.accept(player, knowledge);
             player.getInventory().setItem(0, new ItemStack(Items.IRON_INGOT, 3));
             player.getInventory().setItem(1, new ItemStack(Items.OAK_PLANKS, 2));
-            knowledge.sync(player);
+            knowledge.queueSync(player);
         });
     }
     private static TrackerPreferences preferences() {
@@ -181,12 +183,13 @@ public final class TrackerClientSmoke {
     }
     private static void click(Minecraft mc) {
         Button b = button(mc);
-        var click = new MouseButtonEvent(b.getX() + 5, b.getY() + 5, new MouseButtonInfo(0, 0));
-        check(mc.screen.mouseClicked(click, false), "Mouse click not handled");
-        mc.screen.mouseReleased(click);
+        double x = b.getX() + 5;
+        double y = b.getY() + 5;
+        check(mc.screen.mouseClicked(x, y, 0), "Mouse click not handled");
+        mc.screen.mouseReleased(x, y, 0);
     }
     private static void capture(Minecraft mc, String name) {
-        Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), 1, message -> {});
+        Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), message -> {});
     }
     private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
 }

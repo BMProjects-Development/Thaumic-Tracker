@@ -1,7 +1,7 @@
 package org.bmp.thaumictracker;
 
 import com.leclowndu93150.thaumaturge.api.aspect.AspectComponents;
-import com.leclowndu93150.thaumaturge.api.capability.KnowledgeAccess;
+import com.leclowndu93150.thaumaturge.api.capability.PlayerResearchAccess;
 import com.leclowndu93150.thaumaturge.api.capability.KnowledgeType;
 import com.leclowndu93150.thaumaturge.api.research.IResearchEntry;
 import com.leclowndu93150.thaumaturge.api.research.ResearchRequirement;
@@ -12,7 +12,7 @@ import com.leclowndu93150.thaumaturge.content.research.note.ResearchNotes;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -23,22 +23,22 @@ public record TrackerSnapshot(Component title, Component status, List<Row> rows,
         public Row(Component text, ItemStack icon, boolean met) { this(text, icon, met, ""); }
     }
 
-    public static TrackerSnapshot read(Player player, Identifier id) {
+    public static TrackerSnapshot read(Player player, ResourceLocation id) {
         var holder = player.registryAccess().lookup(IResearchEntry.REGISTRY_KEY)
                 .flatMap(registry -> registry.get(ResourceKey.create(IResearchEntry.REGISTRY_KEY, id)));
         if (holder.isEmpty()) return new TrackerSnapshot(Component.literal(id.toString()),
                 tr("missing"), List.of(), false);
         var entry = holder.get().value();
-        var knowledge = KnowledgeAccess.of(player);
+        var knowledge = PlayerResearchAccess.of(player);
         Component title = Component.translatable(entry.nameKey());
-        if (knowledge.isResearchComplete(id)) return new TrackerSnapshot(title, tr("complete"), List.of(), false);
-        if (!knowledge.isResearchKnown(id)) return new TrackerSnapshot(title, tr("locked"), List.of(), false);
-        int index = Math.clamp(knowledge.researchStage(id), 0, entry.stages().size() - 1);
+        if (knowledge.hasCompleted(id)) return new TrackerSnapshot(title, tr("complete"), List.of(), false);
+        if (!knowledge.knows(id)) return new TrackerSnapshot(title, tr("locked"), List.of(), false);
+        int index = Math.clamp(knowledge.stageOf(id), 0, entry.stages().size() - 1);
         var stage = entry.stages().get(index);
         List<Row> rows = new ArrayList<>();
-        for (Identifier required : stage.requiredResearch()) {
+        for (ResourceLocation required : stage.requiredResearch()) {
             Component name = ResearchNotes.entryName(player.registryAccess(), required);
-            rows.add(new Row(tr("research", name), ItemStack.EMPTY, knowledge.isResearchComplete(required)));
+            rows.add(new Row(tr("research", name), ItemStack.EMPTY, knowledge.hasCompleted(required)));
         }
         for (ResearchRequirement required : stage.obtain()) {
             int have = ResearchManager.countMatching(player, required);
@@ -54,8 +54,8 @@ public record TrackerSnapshot(Component title, Component status, List<Row> rows,
         int ordinal = ResearchNotes.theoryRowsBefore(entry, index);
         for (var required : stage.requiredKnowledge()) {
             if (required.type() == KnowledgeType.THEORY) {
-                Identifier learnKey = ResearchNoteData.learnKey(id, ordinal++);
-                rows.add(new Row(tr("theory", ordinal), ItemStack.EMPTY, knowledge.isResearchKnown(learnKey)));
+                ResourceLocation learnKey = ResearchNoteData.learnKey(id, ordinal++);
+                rows.add(new Row(tr("theory", ordinal), ItemStack.EMPTY, knowledge.knows(learnKey)));
             }
         }
         // Observations spend aspect-pool points; theory requires learned notes, not knowledge levels.

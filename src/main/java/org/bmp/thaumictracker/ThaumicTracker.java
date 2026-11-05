@@ -4,7 +4,7 @@ import com.leclowndu93150.thaumaturge.client.screen.research.EntryDetailScreen;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -23,14 +23,14 @@ import org.lwjgl.glfw.GLFW;
 @Mod(value = ThaumicTracker.ID, dist = Dist.CLIENT)
 public final class ThaumicTracker {
     public static final String ID = "thaumictracker";
-    private static final KeyMapping.Category CATEGORY = new KeyMapping.Category(Identifier.fromNamespaceAndPath(ID, "main"));
+    private static final String CATEGORY = "key.categories.thaumictracker.main";
     public static final KeyMapping TOGGLE = new KeyMapping("key.thaumictracker.toggle", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J, CATEGORY);
     public static final KeyMapping NEXT_PAGE = new KeyMapping("key.thaumictracker.next_page", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_BRACKET, CATEGORY);
     private final TrackerPreferences preferences = new TrackerPreferences(FMLPaths.CONFIGDIR.get().resolve("thaumictracker.json"));
     private final TrackerHud hud = new TrackerHud();
     private Object connection;
     private String context;
-    private Identifier selected;
+    private ResourceLocation selected;
     private TrackerSnapshot snapshot;
     private int ticks;
 
@@ -42,12 +42,11 @@ public final class ThaumicTracker {
     }
 
     private void registerKeys(RegisterKeyMappingsEvent event) {
-        event.registerCategory(CATEGORY);
         event.register(TOGGLE);
         event.register(NEXT_PAGE);
     }
     private void registerHud(RegisterGuiLayersEvent event) {
-        event.registerAbove(VanillaGuiLayers.EXPERIENCE_LEVEL, Identifier.fromNamespaceAndPath(ID, "research"),
+        event.registerAbove(VanillaGuiLayers.EXPERIENCE_LEVEL, ResourceLocation.fromNamespaceAndPath(ID, "research"),
                 (graphics, delta) -> {
                     if (preferences.visible() && selected != null && snapshot != null) hud.render(graphics, snapshot);
                 });
@@ -86,7 +85,7 @@ public final class ThaumicTracker {
         }
         context = TrackerPreferences.contextKey(world, mc.player.getUUID().toString());
         String stored = preferences.selected(context);
-        selected = stored == null ? null : Identifier.tryParse(stored);
+        selected = stored == null ? null : ResourceLocation.tryParse(stored);
         hud.reset();
         refresh(mc);
     }
@@ -99,7 +98,7 @@ public final class ThaumicTracker {
         if (!(event.getScreen() instanceof EntryDetailScreen screen)) return;
         Minecraft mc = Minecraft.getInstance();
         updateSession(mc);
-        Identifier entry = ((EntryDetailScreenAccessor) (Object) screen).thaumictracker$model().entryId();
+        ResourceLocation entry = ((EntryDetailScreenAccessor) (Object) screen).thaumictracker$entryId();
         TrackBookmark button = new TrackBookmark(screen.width, screen.height, entry.equals(selected), pressed -> {
             updateSession(mc);
             if (context == null) return;

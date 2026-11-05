@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
@@ -25,7 +25,7 @@ public final class TrackerHud {
     public void nextPage() { page = (page + 1) % pages; }
     public void reset() { page = 0; pages = 1; lastStatus = null; }
 
-    public void render(GuiGraphicsExtractor graphics, TrackerSnapshot snapshot) {
+    public void render(GuiGraphics graphics, TrackerSnapshot snapshot) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null || mc.options.hideGui || mc.getDebugOverlay().showDebugScreen()) return;
         int width = Math.min(WIDTH, (int) ((graphics.guiWidth() - 16) / SCALE));
@@ -47,20 +47,20 @@ public final class TrackerHud {
         int rowsHeight = visible.stream().mapToInt(RowLayout::height).sum();
         int height = header + rowsHeight + readyHeight + (pages > 1 ? 13 : 0) + 4;
 
-        graphics.pose().pushMatrix();
-        graphics.pose().scale(SCALE, SCALE);
+        graphics.pose().pushPose();
+        graphics.pose().scale(SCALE, SCALE, 1);
         try {
             graphics.fill(x, y, x + width, y + height, 0xA0181520);
             graphics.fill(x, y, x + width, y + 1, 0x605F4E70);
             graphics.fill(x, y, x + 26, y + 1, 0xC0B69ACB);
             int lineY = y + 7;
             for (var line : title) {
-                graphics.text(mc.font, line, x + 7, lineY, TEXT, false);
+                graphics.drawString(mc.font, line, x + 7, lineY, TEXT, false);
                 lineY += 10;
             }
             lineY += 3;
             for (var line : status) {
-                graphics.text(mc.font, line, x + 7, lineY, MUTED, false);
+                graphics.drawString(mc.font, line, x + 7, lineY, MUTED, false);
                 lineY += 9;
             }
             graphics.fill(x + 7, y + header - 4, x + width - 7, y + header - 3, 0x205F4E70);
@@ -77,34 +77,34 @@ public final class TrackerHud {
                     graphics.fill(x + 7, rowY + 6, x + 9, rowY + 8, 0x907D708C);
                 }
                 if (!row.icon().isEmpty()) {
-                    graphics.pose().pushMatrix();
-                    graphics.pose().translate(x + 14, rowY + 1);
-                    graphics.pose().scale(0.75f, 0.75f);
-                    graphics.item(row.icon(), 0, 0);
-                    graphics.pose().popMatrix();
+                    graphics.pose().pushPose();
+                    graphics.pose().translate(x + 14, rowY + 1, 0);
+                    graphics.pose().scale(0.75f, 0.75f, 1);
+                    graphics.renderItem(row.icon(), 0, 0);
+                    graphics.pose().popPose();
                 }
                 int textY = rowY + (layout.lines().size() == 1 ? 3 : 0);
                 for (var line : layout.lines()) {
-                    graphics.text(mc.font, line, x + layout.textOffset(), textY, color, false);
+                    graphics.drawString(mc.font, line, x + layout.textOffset(), textY, color, false);
                     textY += 9;
                 }
-                if (!row.count().isEmpty()) graphics.text(mc.font, row.count(),
+                if (!row.count().isEmpty()) graphics.drawString(mc.font, row.count(),
                         x + width - 7 - mc.font.width(row.count()), rowY + 3, row.met() ? MET : MUTED, false);
                 rowY += layout.height();
             }
             if (!ready.isEmpty()) {
                 rowY += 3;
                 for (var line : ready) {
-                    graphics.text(mc.font, line, x + 7, rowY, MET, false);
+                    graphics.drawString(mc.font, line, x + 7, rowY, MET, false);
                     rowY += 9;
                 }
                 rowY += 2;
             }
-            if (pages > 1) graphics.text(mc.font,
+            if (pages > 1) graphics.drawString(mc.font,
                     TrackerSnapshot.tr("page", page + 1, pages, ThaumicTracker.NEXT_PAGE.getTranslatedKeyMessage()),
                     x + 7, rowY + 2, MUTED, false);
         } finally {
-            graphics.pose().popMatrix();
+            graphics.pose().popPose();
         }
     }
 

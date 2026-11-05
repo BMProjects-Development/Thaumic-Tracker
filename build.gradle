@@ -6,7 +6,7 @@ version = mod_version
 group = mod_group_id
 base { archivesName = "${mod_id}-${minecraft_version}" }
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
     withSourcesJar()
 }
 sourceSets {
@@ -28,6 +28,7 @@ neoForge {
             type = 'gameTestServer'
             gameDirectory = file('run-gametest')
             systemProperty 'thaumictracker.gameTests', 'true'
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
         }
         clientSmoke {
             client()
@@ -45,8 +46,8 @@ neoForge {
 }
 dependencies {
     implementation "curse.maven:thaumaturge-1628024:${thaumaturge_file_id}"
-    runtimeOnly 'curse.maven:curios-309927:8463519'
-    runtimeOnly 'curse.maven:lithostitched-936015:8944658'
+    runtimeOnly 'curse.maven:curios-309927:6529130'
+    runtimeOnly 'curse.maven:lithostitched-936015:9170709'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

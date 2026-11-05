@@ -1,10 +1,13 @@
 """Exercise release replacement without contacting GitHub."""
 
 from pathlib import Path
+import os
+import sys
 import tempfile
 import unittest
 
-from release import GitHub, metadata, publish
+from curseforge import uploads_in, with_uploads
+from release import GitHub, main, metadata, publish
 from unittest.mock import patch
 from urllib.error import HTTPError
 
@@ -34,9 +37,9 @@ class FakeGitHub:
                 return self.releases.get(self.latest)
             if route.startswith("/git/ref/tags/"):
                 return self.tags.get(route.removeprefix("/git/ref/tags/"))
-        if method == "DELETE" and route.startswith("/releases/"):
-            tag = next(tag for tag, release in self.releases.items() if str(release["id"]) == route.split("/")[-1])
-            del self.releases[tag]
+        if method == "DELETE" and route.startswith("/releases/assets/"):
+            asset_id = int(route.split("/")[-1])
+            self.draft["assets"] = [asset for asset in self.draft["assets"] if asset["id"] != asset_id]
             return None
         if method == "PATCH" and route.startswith("/git/refs/tags/"):
             self.tags[route.removeprefix("/git/refs/tags/")] = data["sha"]
@@ -47,16 +50,25 @@ class FakeGitHub:
         if method == "POST" and route == "/releases":
             release = {**data, "id": 99, "upload_url": "https://uploads.test/assets{?name,label}", "html_url": "https://github.test/release"}
             self.releases[data["tag_name"]] = release
+            self.draft = release
+            release["assets"] = []
             return release
         if method == "POST" and endpoint.startswith("https://uploads.test/"):
             if self.fail_upload:
                 raise RuntimeError("Upload failed")
             self.uploads.append((endpoint, data))
+            self.draft["assets"].append({"id": 1000 + len(self.uploads)})
             return {}
-        if method == "PATCH" and route == "/releases/99":
-            release = next(release for release in self.releases.values() if release["id"] == 99)
+        if method == "PATCH" and route.startswith("/releases/"):
+            release_id = int(route.split("/")[-1])
+            release = next(release for release in self.releases.values() if release["id"] == release_id)
             release.update(data)
-            if data["make_latest"] == "true":
+            if data.get("draft"):
+                self.draft = release
+                release.setdefault("assets", [])
+                release.setdefault("upload_url", "https://uploads.test/assets{?name,label}")
+                release.setdefault("html_url", "https://github.test/release")
+            if data.get("make_latest") == "true":
                 self.latest = release["tag_name"]
             return release
         raise AssertionError(f"Unexpected API call: {method} {endpoint}")
@@ -69,71 +81,76 @@ class ReleaseTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "changelogs").mkdir()
 
-    def inputs(self, version="1.1"):
+    def inputs(self, version="1.1", minecraft="1.21.1"):
         (self.root / "gradle.properties").write_text(
-            f"mod_id=thaumictracker\nmod_version={version}\nminecraft_version=26.1.2\n", encoding="utf-8"
+            f"mod_id=thaumictracker\nmod_version={version}\nminecraft_version={minecraft}\n", encoding="utf-8"
         )
         notes = self.root / "changelogs" / f"{version}.md"
         notes.write_text(f"# Thaumic Tracker {version}\n\n- Clearer guides.\n", encoding="utf-8")
-        stem = f"thaumictracker-26.1.2-{version}"
+        stem = f"thaumictracker-{minecraft}-{version}"
         for name in (f"{stem}.jar", f"{stem}-sources.jar", f"Thaumic-Tracker-{version}.zip"):
             (self.root / name).write_bytes(b"tested artifact")
         return stem, notes
 
-    def publish(self, api, version="1.1", ref="refs/heads/main"):
+    def publish(self, api, version="1.1", ref="refs/heads/1.21.1"):
         stem, notes = self.inputs(version)
-        return publish(api, "owner/repo", "tested", ref, version, stem, self.root, notes)
+        return publish(api, "owner/repo", "tested", ref, version, stem, self.root, notes, "1.21.1")
 
     def test_same_version_is_replaced_and_retagged(self):
         older = {"id": 1, "tag_name": "v1.0"}
-        api = FakeGitHub({"v1.0": older, "v1.1": {"id": 2, "tag_name": "v1.1"}}, "v1.1", tags={"v1.0": "original", "v1.1": "old"})
+        receipt = {"a" * 64: 12345}
+        existing = {"id": 2, "tag_name": "v1.1-mc1.21.1", "body": with_uploads("Old notes", receipt), "assets": [{"id": 7}]}
+        api = FakeGitHub({"v1.0": older, "v1.1-mc1.21.1": existing}, "v1.1-mc1.21.1", tags={"v1.0": "original", "v1.1-mc1.21.1": "old"})
         self.publish(api)
-        self.assertIn(("DELETE", "/repos/owner/repo/releases/2", None), api.calls)
+        self.assertIn(("DELETE", "/repos/owner/repo/releases/assets/7", None), api.calls)
         self.assertEqual(api.releases["v1.0"], older)
-        self.assertEqual(api.tags, {"v1.0": "original", "v1.1": "tested"})
-        self.assertEqual(api.latest, "v1.1")
-        self.assertIn("Clearer guides.", api.releases["v1.1"]["body"])
+        self.assertEqual(api.tags, {"v1.0": "original", "v1.1-mc1.21.1": "tested"})
+        self.assertEqual(api.latest, "v1.1-mc1.21.1")
+        self.assertIn("Clearer guides.", api.releases["v1.1-mc1.21.1"]["body"])
+        self.assertEqual(uploads_in(api.releases["v1.1-mc1.21.1"]["body"]), receipt)
+        self.assertEqual(api.releases["v1.1-mc1.21.1"]["id"], 2)
+        self.assertEqual(len(api.releases["v1.1-mc1.21.1"]["assets"]), 3)
         self.assertEqual(len(api.uploads), 3)
         self.assertEqual(api.calls[-1][2], {"draft": False, "make_latest": "true"})
 
     def test_new_patch_and_minor_versions_preserve_previous_releases(self):
         for version in ("1.1.1", "1.2"):
             with self.subTest(version=version):
-                old = {"id": 2, "tag_name": "v1.1"}
-                api = FakeGitHub({"v1.1": old}, "v1.1", tags={"v1.1": "original"})
+                old = {"id": 2, "tag_name": "v1.1-mc1.21.1"}
+                api = FakeGitHub({"v1.1-mc1.21.1": old}, "v1.1-mc1.21.1", tags={"v1.1-mc1.21.1": "original"})
                 self.publish(api, version)
-                self.assertEqual(api.releases["v1.1"], old)
-                self.assertEqual(api.tags["v1.1"], "original")
-                self.assertEqual(api.latest, f"v{version}")
+                self.assertEqual(api.releases["v1.1-mc1.21.1"], old)
+                self.assertEqual(api.tags["v1.1-mc1.21.1"], "original")
+                self.assertEqual(api.latest, f"v{version}-mc1.21.1")
                 self.assertFalse(any(method == "DELETE" for method, _, _ in api.calls))
 
     def test_older_tag_does_not_replace_latest_version(self):
-        api = FakeGitHub({"v1.2": {"id": 3, "tag_name": "v1.2"}}, "v1.2", tags={"v1.1": "tested"})
-        self.publish(api, ref="refs/tags/v1.1")
-        self.assertEqual(api.latest, "v1.2")
+        api = FakeGitHub({"v1.2-mc1.21.1": {"id": 3, "tag_name": "v1.2-mc1.21.1"}}, "v1.2-mc1.21.1", tags={"v1.1-mc1.21.1": "tested"})
+        self.publish(api, ref="refs/tags/v1.1-mc1.21.1")
+        self.assertEqual(api.latest, "v1.2-mc1.21.1")
         self.assertEqual(api.calls[-1][2]["make_latest"], "false")
 
     def test_stale_branch_or_tag_build_does_not_mutate_github(self):
-        for ref in ("refs/heads/main", "refs/tags/v1.1"):
+        for ref in ("refs/heads/1.21.1", "refs/tags/v1.1-mc1.21.1"):
             with self.subTest(ref=ref):
                 api = FakeGitHub(head="newer")
                 self.assertIsNone(self.publish(api, ref=ref))
                 self.assertTrue(all(method == "GET" for method, _, _ in api.calls))
 
     def test_unrelated_branch_or_mismatched_tag_cannot_publish(self):
-        for ref in ("refs/heads/feature", "refs/tags/v1.2", "refs/pull/7/merge"):
+        for ref in ("refs/heads/feature", "refs/heads/main", "refs/tags/v1.2-mc1.21.1", "refs/pull/7/merge"):
             with self.subTest(ref=ref):
                 api = FakeGitHub()
                 with self.assertRaises(ValueError):
                     self.publish(api, ref=ref)
                 self.assertTrue(all(method == "GET" for method, _, _ in api.calls))
 
-    def test_missing_artifact_is_detected_before_deleting_release(self):
+    def test_missing_artifact_is_detected_before_changing_release(self):
         stem, notes = self.inputs()
         (self.root / f"{stem}.jar").unlink()
-        api = FakeGitHub({"v1.1": {"id": 2, "tag_name": "v1.1"}})
+        api = FakeGitHub({"v1.1-mc1.21.1": {"id": 2, "tag_name": "v1.1-mc1.21.1"}})
         with self.assertRaises(ValueError):
-            publish(api, "owner/repo", "tested", "refs/heads/main", "1.1", stem, self.root, notes)
+            publish(api, "owner/repo", "tested", "refs/heads/main", "1.1", stem, self.root, notes, "1.21.1")
         self.assertEqual(api.calls, [])
 
     def test_failed_upload_keeps_release_unpublished(self):
@@ -141,26 +158,69 @@ class ReleaseTests(unittest.TestCase):
         api.fail_upload = True
         with self.assertRaises(RuntimeError):
             self.publish(api)
-        self.assertTrue(api.releases["v1.1"]["draft"])
+        self.assertTrue(api.releases["v1.1-mc1.21.1"]["draft"])
         self.assertFalse(any(method == "PATCH" and route.endswith("/releases/99") for method, route, _ in api.calls))
         api.fail_upload = False
         self.publish(api)
-        self.assertFalse(api.releases["v1.1"]["draft"])
+        self.assertFalse(api.releases["v1.1-mc1.21.1"]["draft"])
         self.assertEqual(len(api.uploads), 3)
 
     def test_replacement_finds_release_beyond_first_page(self):
         releases = {f"v2.{number}": {"id": 100 + number, "tag_name": f"v2.{number}"} for number in range(100)}
-        releases["v1.1"] = {"id": 2, "tag_name": "v1.1"}
+        releases["v1.1-mc1.21.1"] = {"id": 2, "tag_name": "v1.1-mc1.21.1"}
         api = FakeGitHub(releases, "v2.99")
         self.publish(api)
-        self.assertIn(("DELETE", "/repos/owner/repo/releases/2", None), api.calls)
+        self.assertTrue(any(method == "PATCH" and route.endswith("/releases/2") for method, route, _ in api.calls))
         self.assertEqual(len(api.releases), 101)
         self.assertEqual(api.latest, "v2.99")
 
     def test_prerelease_does_not_become_latest(self):
-        api = FakeGitHub({"v1.1": {"id": 2, "tag_name": "v1.1"}}, "v1.1")
+        api = FakeGitHub({"v1.1-mc1.21.1": {"id": 2, "tag_name": "v1.1-mc1.21.1"}}, "v1.1-mc1.21.1")
         self.publish(api, version="1.2-beta")
-        self.assertTrue(api.releases["v1.2-beta"]["prerelease"])
+        self.assertTrue(api.releases["v1.2-beta-mc1.21.1"]["prerelease"])
+        self.assertEqual(api.latest, "v1.1-mc1.21.1")
+
+    def test_minecraft_branch_preserves_other_minecraft_releases(self):
+        legacy = {"id": 1, "tag_name": "v1.1"}
+        latest = {"id": 2, "tag_name": "v1.2.1"}
+        api = FakeGitHub({"v1.1": legacy, "v1.2.1": latest}, "v1.2.1",
+                         tags={"v1.1": "legacy", "v1.2.1": "newer"})
+        self.publish(api, ref="refs/heads/1.21.1")
+        self.assertEqual(api.releases["v1.1"], legacy)
+        self.assertEqual(api.releases["v1.2.1"], latest)
+        self.assertEqual(api.tags["v1.1"], "legacy")
+        self.assertEqual(api.tags["v1.2.1"], "newer")
+        self.assertEqual(api.tags["v1.1-mc1.21.1"], "tested")
+        self.assertEqual(api.latest, "v1.2.1")
+        self.assertFalse(api.releases["v1.1-mc1.21.1"]["prerelease"])
+        self.assertIn("Minecraft 1.21.1", api.releases["v1.1-mc1.21.1"]["name"])
+
+    def test_legacy_tag_and_other_minecraft_branch_cannot_publish(self):
+        for ref in ("refs/tags/v1.1", "refs/heads/26.1.2", "refs/tags/v1.1-mc26.1.2"):
+            with self.subTest(ref=ref):
+                api = FakeGitHub()
+                with self.assertRaises(ValueError):
+                    self.publish(api, ref=ref)
+                self.assertTrue(all(method == "GET" for method, _, _ in api.calls))
+
+    def test_minecraft_release_with_same_mod_version_keeps_main_latest(self):
+        latest = {"id": 2, "tag_name": "v1.3"}
+        api = FakeGitHub({"v1.3": latest}, "v1.3", tags={"v1.3": "main-commit"})
+        self.publish(api, version="1.3", ref="refs/heads/1.21.1")
+        self.assertEqual(api.releases["v1.3"], latest)
+        self.assertEqual(api.tags["v1.3"], "main-commit")
+        self.assertIn("v1.3-mc1.21.1", api.releases)
+        self.assertEqual(api.latest, "v1.3")
+
+    def test_main_replaces_legacy_tag_and_becomes_latest_at_equal_version(self):
+        backport = {"id": 2, "tag_name": "v1.1-mc1.21.1"}
+        api = FakeGitHub({backport["tag_name"]: backport, "v1.1": {"id": 3, "tag_name": "v1.1"}},
+                         backport["tag_name"], tags={backport["tag_name"]: "port", "v1.1": "old"})
+        stem, notes = self.inputs(minecraft="26.1.2")
+        self.assertEqual(metadata(self.root)[1], "v1.1")
+        publish(api, "owner/repo", "tested", "refs/heads/main", "1.1", stem, self.root, notes, "26.1.2")
+        self.assertEqual(api.tags, {"v1.1-mc1.21.1": "port", "v1.1": "tested"})
+        self.assertEqual(api.releases[backport["tag_name"]], backport)
         self.assertEqual(api.latest, "v1.1")
 
     def test_missing_notes_or_invalid_version_fails_validation(self):
@@ -169,13 +229,31 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             metadata(self.root)
         for version in ("../1.1", "1", "1.1\nmod_id=invalid-id"):
-            (self.root / "gradle.properties").write_text(f"mod_id=thaumictracker\nmod_version={version}\nminecraft_version=26.1.2\n", encoding="utf-8")
+            (self.root / "gradle.properties").write_text(f"mod_id=thaumictracker\nmod_version={version}\nminecraft_version=1.21.1\n", encoding="utf-8")
             with self.assertRaises(ValueError):
                 metadata(self.root)
 
     def test_valid_metadata(self):
         self.inputs()
-        self.assertEqual(metadata(self.root)[:3], ("1.1", "v1.1", "thaumictracker-26.1.2-1.1"))
+        self.assertEqual(metadata(self.root)[:3], ("1.1", "v1.1-mc1.21.1", "thaumictracker-1.21.1-1.1"))
+
+    def test_check_accepts_only_the_matching_minecraft_tag(self):
+        self.inputs()
+        output = self.root / "output.txt"
+        inputs = metadata(self.root)
+        for ref in ("refs/heads/1.21.1", "refs/pull/7/merge", "refs/tags/v1.1-mc1.21.1"):
+            with self.subTest(ref=ref), patch("release.metadata", return_value=inputs), \
+                    patch.dict(os.environ, GITHUB_REF=ref, GITHUB_OUTPUT=str(output)), \
+                    patch.object(sys, "argv", ["release.py", "check"]):
+                output.write_text("", encoding="utf-8")
+                main()
+                self.assertIn("tag=v1.1-mc1.21.1\n", output.read_text(encoding="utf-8"))
+        for ref in ("refs/tags/v1.1", "refs/tags/v1.2-mc1.21.1", "refs/tags/v1.1-mc26.1.2"):
+            with self.subTest(ref=ref), patch("release.metadata", return_value=inputs), \
+                    patch.dict(os.environ, GITHUB_REF=ref), \
+                    patch.object(sys, "argv", ["release.py", "check"]):
+                with self.assertRaises(ValueError):
+                    main()
 
     def test_api_treats_only_404_as_missing(self):
         api = GitHub("test-token", "https://api.github.test")

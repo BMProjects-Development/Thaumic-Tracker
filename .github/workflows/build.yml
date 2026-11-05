@@ -98,11 +98,12 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    name: Publish GitHub release
+    name: Publish GitHub and CurseForge releases
     needs: build
     if: >-
       github.event_name != 'pull_request' &&
       (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
+       github.ref == 'refs/heads/1.21.1' ||
        startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -129,7 +130,15 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Publish or replace this version
+      - name: Publish or replace this version on GitHub
+        id: github-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python .github/scripts/release.py publish
+
+      - name: Publish tested mod JAR to CurseForge
+        if: steps.github-release.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: python .github/scripts/release.py publish-curseforge

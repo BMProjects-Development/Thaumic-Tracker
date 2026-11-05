@@ -10,7 +10,11 @@ from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+import curseforge
 
+
+BACKPORT = "1.21.1"
+BACKPORT_SUFFIX = f"-mc{BACKPORT}"
 VERSION = re.compile(r"[0-9]+(?:\.[0-9]+)+(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?")
 
 
@@ -32,7 +36,11 @@ def metadata(root):
     notes = root / "changelogs" / f"{version}.md"
     if not notes.is_file() or not notes.read_text(encoding="utf-8").strip():
         raise ValueError(f"Add release notes in changelogs/{version}.md")
-    return version, f"v{version}", f"{mod_id}-{minecraft}-{version}", notes
+    return version, release_tag(version, minecraft), f"{mod_id}-{minecraft}-{version}", notes, minecraft
+
+
+def release_tag(version, minecraft):
+    return f"v{version}{BACKPORT_SUFFIX if minecraft == BACKPORT else ''}"
 
 
 class GitHub:
@@ -61,13 +69,13 @@ class GitHub:
 
 
 def version_key(tag):
-    version = tag.removeprefix("v")
+    version = tag.removeprefix("v").removesuffix(BACKPORT_SUFFIX)
     if not VERSION.fullmatch(version):
-        return ()
+        return (), False
     numbers = [int(part) for part in version.split("-", 1)[0].split(".")]
     while numbers and numbers[-1] == 0:
         numbers.pop()
-    return tuple(numbers)
+    return tuple(numbers), not tag.endswith(BACKPORT_SUFFIX)
 
 
 def find_release(api, base, tag):
@@ -83,8 +91,17 @@ def find_release(api, base, tag):
         page += 1
 
 
-def publish(api, repository, sha, ref, version, stem, artifact_dir, notes):
-    tag = f"v{version}"
+def is_current(api, base, ref, sha):
+    ref_name = ref.removeprefix("refs/")
+    head = api.request("GET", f"{base}/commits/{quote(ref_name, safe='')}", missing_ok=True)
+    if head is None or head["sha"] != sha:
+        print("Skipping an outdated build: the remote ref no longer points to this commit.")
+        return False
+    return True
+
+
+def publish(api, repository, sha, ref, version, stem, artifact_dir, notes, minecraft):
+    tag = release_tag(version, minecraft)
     files = [artifact_dir / name for name in (
         f"{stem}.jar", f"{stem}-sources.jar", f"Thaumic-Tracker-{version}.zip"
     )]
@@ -97,12 +114,10 @@ def publish(api, repository, sha, ref, version, stem, artifact_dir, notes):
 
     base = f"/repos/{repository}"
     default_branch = api.request("GET", base)["default_branch"]
-    if ref not in (f"refs/heads/{default_branch}", f"refs/tags/{tag}"):
-        raise ValueError("Only the default branch or the matching version tag can publish")
-    ref_name = ref.split("/", 2)[2]
-    head = api.request("GET", f"{base}/commits/{quote(ref_name, safe='')}", missing_ok=True)
-    if head is None or head["sha"] != sha:
-        print("Skipping an outdated build: the remote ref no longer points to this commit.")
+    branch = BACKPORT if minecraft == BACKPORT else default_branch
+    if ref not in (f"refs/heads/{branch}", f"refs/tags/{tag}"):
+        raise ValueError("Only the release branch for this Minecraft version or the matching tag can publish")
+    if not is_current(api, base, ref, sha):
         return None
 
     existing = find_release(api, base, tag)
@@ -111,27 +126,33 @@ def publish(api, repository, sha, ref, version, stem, artifact_dir, notes):
     if existing and existing.get("immutable"):
         raise ValueError(f"Release {tag} is immutable; GitHub does not allow replacing it")
     prerelease = "-" in version
+    # Keep the default Minecraft release as Latest when the mod versions tie.
     make_latest = not prerelease and (
         latest is None or version_key(tag) >= version_key(latest["tag_name"])
     )
 
-    # Only this version is replaced. Other releases and tags are preserved.
+    uploads = curseforge.uploads_in(existing.get("body")) if existing else {}
+    draft = {
+        "tag_name": tag,
+        "target_commitish": sha,
+        "name": f"Thaumic Tracker {version} (Minecraft {minecraft})",
+        "body": curseforge.with_uploads(body, uploads),
+        "draft": True,
+        "prerelease": prerelease,
+    }
+    # Keep the upload receipts on the same release even if replacing assets fails.
     if existing:
-        api.request("DELETE", f"{base}/releases/{existing['id']}")
+        release = api.request("PATCH", f"{base}/releases/{existing['id']}", draft)
+        for asset in release["assets"]:
+            api.request("DELETE", f"{base}/releases/assets/{asset['id']}")
     if current_tag:
         api.request("PATCH", f"{base}/git/refs/tags/{tag}", {"sha": sha, "force": True})
     else:
         api.request("POST", f"{base}/git/refs", {"ref": f"refs/tags/{tag}", "sha": sha})
 
     # Upload every tested artifact before making the release visible.
-    release = api.request("POST", f"{base}/releases", {
-        "tag_name": tag,
-        "target_commitish": sha,
-        "name": f"Thaumic Tracker {version}",
-        "body": body,
-        "draft": True,
-        "prerelease": prerelease,
-    })
+    if not existing:
+        release = api.request("POST", f"{base}/releases", draft)
     upload_url = release["upload_url"].split("{", 1)[0]
     for file in files:
         api.request("POST", upload_url + "?" + urlencode({"name": file.name}), file.read_bytes())
@@ -143,21 +164,36 @@ def publish(api, repository, sha, ref, version, stem, artifact_dir, notes):
 
 def main():
     root = Path(__file__).resolve().parents[2]
-    version, tag, stem, notes = metadata(root)
+    version, tag, stem, notes, minecraft = metadata(root)
     ref = os.environ["GITHUB_REF"]
     if ref.startswith("refs/tags/") and ref != f"refs/tags/{tag}":
-        raise ValueError("Tag must match mod_version in gradle.properties")
-    if len(sys.argv) != 2 or sys.argv[1] not in ("check", "publish"):
-        raise ValueError("Usage: release.py check|publish")
+        raise ValueError(f"Expected release tag {tag} for this Minecraft and mod version")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("check", "publish", "publish-curseforge"):
+        raise ValueError("Usage: release.py check|publish|publish-curseforge")
     if sys.argv[1] == "check":
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
             output.write(f"version={version}\ntag={tag}\nstem={stem}\n")
         return
     sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     api = GitHub(os.environ["GH_TOKEN"], os.environ.get("GITHUB_API_URL", "https://api.github.com"))
-    url = publish(api, os.environ["GITHUB_REPOSITORY"], sha, ref, version, stem, root / "release", notes)
+    repository = os.environ["GITHUB_REPOSITORY"]
+    if sys.argv[1] == "publish-curseforge":
+        base = f"/repos/{repository}"
+        tag_ref = f"refs/tags/{tag}"
+        if is_current(api, base, ref, sha) and (ref == tag_ref or is_current(api, base, tag_ref, sha)):
+            url = curseforge.publish(api, base, tag, version, minecraft, root / "release" / f"{stem}.jar",
+                                    notes.read_text(encoding="utf-8").strip())
+            print(f"CurseForge file for Thaumic Tracker {version}: {url}")
+            if os.environ.get("GITHUB_STEP_SUMMARY"):
+                with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                    summary.write(f"[Thaumic Tracker {version} file on CurseForge]({url}).\n")
+        return
+    url = publish(api, repository, sha, ref, version, stem, root / "release", notes, minecraft)
     if url:
         print(f"Published Thaumic Tracker {version}: {url}")
+        if os.environ.get("GITHUB_OUTPUT"):
+            with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+                output.write("published=true\n")
         if os.environ.get("GITHUB_STEP_SUMMARY"):
             with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
                 summary.write(f"Published [Thaumic Tracker {version}]({url}) from `{sha}`.\n")
